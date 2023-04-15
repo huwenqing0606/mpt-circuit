@@ -83,6 +83,7 @@ impl MptUpdateLookup for MptUpdateConfig {
         //     .map(|(i, column)| column.current() * i)
         //     .sum();
         let proof_type = Query::one();
+        // wenqing: why flip old and new here?
         let old_value_rlc = self.new_value_rlc.current() * is_root();
         let new_value_rlc = self.old_value_rlc.current() * is_root();
         let address = self.address.current();
@@ -127,6 +128,7 @@ impl MptUpdateConfig {
             key_bit.lookup(),
         );
 
+        // wenqing: why this is the same as above constraint
         cb.add_lookup(
             "direction = key.bit(depth)",
             [path_key.current(), depth.current(), direction.current()],
@@ -222,6 +224,7 @@ impl MptUpdateConfig {
     }
 }
 
+// wenqing: next four fns are for old and new hash on left/right sibling
 fn old_left<F: FieldExt>(config: &MptUpdateConfig) -> Query<F> {
     config.direction.current() * config.old_hash.previous()
         + (Query::one() - config.direction.current()) * config.sibling.previous()
