@@ -1,10 +1,10 @@
 # Storage Tree Proof
 
-The storage tree proof helps to check updating on accounts and their storage (via SSTORE and SSLOAD op) are correctly integrated into the storage tree, so the change of state root of EVM has represented and only represented the effects from transactions being executed in EVM. The `Account` and `Storage` records in state proof, which would finally take effect on storage tree, need to be picked into storage tree proof. The storage tree circuit provide EVM's state root are updated sequentially and the final root after being updated by the records sequence from state proof coincided with which being purposed in the new block.
+The storage tree proof helps to check that the updates of accounts and their storage (via SSTORE and SSLOAD op) are correctly integrated into the storage tree, so the change of state root of EVM has represented and only represented the effects of transactions being executed in EVM. The `Account` and `Storage` records in state proof, which would finally take effect on storage tree, need to be picked into storage tree proof. The storage tree circuit proves that the EVM's state root is updated sequentially and the final root after being updated by the records sequence from state proof coincided with the one which is being purposed in the new block.
 
 ## The architecture of state trie
 
-An alternative implement of BMPT (Binary Patricia Merkle Tree) has been applied for the zk-evm as the state trie. The BMPT has replaced the original MPT for world state trie and account storage trie, and a stepwise hashing scheme instead of rlp encoding-hashing has been used for mapping data structures into hashes. For the BMPT implement we have:
+An alternative implementation of BMPT (Binary Patricia Merkle Tree) has been applied for the zk-evm as the state trie. The BMPT has replaced the original MPT for world state trie and account storage trie, and a stepwise hashing scheme instead of rlp encoding-hashing has been used for mapping data structures into hashes. For the BMPT implement we have:
 
 + Replacing all hashing calculations from keccak256 to poseidon hash
 
@@ -26,7 +26,7 @@ To show there is value `v` and key `k` existed for account `addr` we need 4 proo
 3. Proof the account `addr` with stateRoot is `Rs` can be encoded and hashed into one of the leaf node of state trie
 4. Proof the BMPT path for the leaf node in proof `3` against the current root `R` of state trie, is correct
 
-To show the root of state trie change from `R0` to `R1` is contributed by updating key `k` for account `addr` from value `v0` to `v1`, we used 4 proofs as described before for providing `(v0, k, addr) -> R0` and another 4 proofs for providing `(v1, k, addr) -> R1`. Then another updating on storage can be applied on the new state trie with root `R1` and transit it to root `R2`. For a series of *n* updates on storage of EVM which transit state trie from root `R0` to `Rn`, our proofs provide the transition via *n* intermediate roots `R1, R2 ... Rn-1`, and provide *n* transitions `R0 -> R1`, `R1 -> R2`, ... , `Rn-1 -> Rn` caused by the *n* updates are all correct.
+To show the root of state trie change from `R0` to `R1` is contributed by updating key `k` for account `addr` from value `v0` to `v1`, we used 4 proofs as described before for proving `(v0, k, addr) -> R0` and another 4 proofs for proving `(v1, k, addr) -> R1`. Then another updating on storage can be applied on the new state trie with root `R1` and transit it to root `R2`. For a series of *n* updates on storage of EVM which transit state trie from root `R0` to `Rn`, our proofs provide the transition via *n* intermediate roots `R1, R2 ... Rn-1`, and provide *n* transitions `R0 -> R1`, `R1 -> R2`, ... , `Rn-1 -> Rn` caused by the *n* updates are all correct.
 
 For the proof of each transition `Ri -> Ri+1` on the trie. Each of the 4 proofs for the start state `Ri` is paired with the 4 proofs for the end state `Ri+1` and the 4 proof pairs are stacked from bottom to top, so the layout would look like:
 
@@ -39,7 +39,7 @@ For the proof of each transition `Ri -> Ri+1` on the trie. Each of the 4 proofs 
 |       |  <proof 1>     |   <proof 1>  |           |
 |  i+1  |  <proof 4>     |   <proof 4>  | Ri+1, Ri+2|
 
-So there are 5 kinds of proof (4 proof 'pair' mentioned before and a 'padding' proof) which need to be layout to the circuit. Columns in circuit are grouped for 3 parts:
+So there are 5 kinds of proof (4 proof 'pair' mentioned before and a 'padding' proof) which need to be layout to the circuit. Columns in circuit are grouped into 3 parts:
 
 + Controlling part, which enables different proofs being activated in specified row and constrains how adjacent rows for different proofs can transit:
 
@@ -51,11 +51,11 @@ So there are 5 kinds of proof (4 proof 'pair' mentioned before and a 'padding' p
 >        + look up current `(op_type, ctrl_type)` pair from 'external rules' collection when the value of current `op_type` cell is different from the one in above row (the difference must be one)
 >        + look up current `(op_type, ctrl_type)` pair from 'internal rules' collection when the value of current `op_delta_aux` is one
 
-+ Data part currently has 3 cols `data_0` ~ `data_2` which dedicate to values whose relations should be provided to be correct by a proof, and 3 additional cols `data_0_ext` ~ `data_2_ext` if 1 field is not enough to represent the value (like codehash and storekey/value). Different proofs assign specified data on those columns: For proofs 1 and 3 (the BMPT proof), the hashes of nodes for the BMPT before and after updating are recorded in `data_0` and `data_1` respectively; for proof 2 `data_0` and `data_1` are used for account hash before and after being updated. Proofs can also refer cells in data columns which belong to the rows adjacent to it, i.e. the data which has been provided by another proof.
++ Data part currently has 3 cols `data_0` ~ `data_2` which dedicate to values whose relations should be provided to be correct by a proof, and 3 additional cols `data_0_ext` ~ `data_2_ext` if 1 field is not enough to represent the value (like codehash and storekey/value). Different proofs assign specified data on those columns: For proofs 1 and 3 (the BMPT proof), the hashes of nodes for the BMPT before and after updating are recorded in `data_0` and `data_1` respectively; for proof 2 `data_0` and `data_1` are used for account hash before and after being updated. Proofs can also refer to cells in data columns which belong to the rows adjacent to it, i.e. the data which has been provided by another proof.
 
 There are also 2 limb cols, named as `data_N_limb_0/1`, for each `data_N` col in case when a 256bit variable is splitted and assigned into them as 2 128-bit limbs.
 
-Since the transition is provided in a series of adjacent rows (a "block") in our layout, and the proof of state trie being stacked first. The beginning row of the proof block always contains the start and end trie roots in the transition. So a `root_aux` col is used to 'carry' the end trie root to the last row of the proof block, to ensure the start trie root of next transition must equal to the end trie root of previous proof block. The layout look like follows:
+Since the transition is proved by providing a series of adjacent rows (a "block") in our layout, and the proof of state trie being stacked first. The beginning row of the proof block always contains the start and end trie roots in the transition. So a `root_aux` col is used to 'carry' the end trie root to the last row of the proof block, to ensure the start trie root of next transition must equal to the end trie root of previous proof block. The layout look like follows:
 
 | series| data_0 *for old_root* | data_1 *for new_root* | root_aux |
 | ----- | -------- | -------- | -------- |
@@ -74,15 +74,15 @@ The constraint for `root_aux` is:
 
 ### BMPT transition proof
 
-This provide an updating on the key `k` of BMPT has made its root to change from `Ri` to `Ri+1` under one of the following three possible transitions:
+This proves that an updating on the key `k` of BMPT has made its root to change from `Ri` to `Ri+1` under one of the following three possible transitions:
 
 1. A new leaf node with value `v1` is created
 2. The leaf node with value `v0` is removed
 3. The leaf node with value `v0` is being updated to value `v1`
 
-It is needed to provide the path in BMPT, from root to the leaf node of key `k`, is valid. Both the BMPT path before and after leaf node `k` being updated has to be provided and the two BMPT path shared the same siblings. It take one row to put the data of one layer in the BMPT path, including the type of node (branch or leaf), the hash of node, the prefix bit for the corresponding layer etc. The two BMPT path for providing should has the same depth. In the case of transitions 1 and 2, a non-existing proof, i.e. a BMPT path from root to an empty node should be provided.
+It is needed to prove that the path in BMPT, from root to the leaf node of key `k`, is valid. Both the BMPT path before and after leaf node `k` being updated has to be proved and the two BMPT path shared the same siblings. It take one row to put the data of one layer in the BMPT path, including the type of node (branch or leaf), the hash of node, the prefix bit for the corresponding layer etc. The two BMPT paths to be proved should have the same depth. In the case of transitions 1 and 2, a non-existing proof, i.e. a BMPT path from root to an empty node should be provided.
 
-For the nature of patricia tree, if there is no leaf with key `k` in the trie and leaf node `k1` which has longest common prefix with `k` in all leafs of the trie. Suppose the length of the common prefix is `l` and currently the length of prefix of leaf node `k1` is still less than `l`, then the depth of BMPT path would be changed after being updated. In this case, in the (non-existing) proof for the empty node of key `k`, the BMPT path has to be re-organized to reflect the trie state right before leaf node of key `k` being updated to an empty node, or right after the leaf node being removed and the empty node left. Take the following as an example:
+Due to the nature of patricia tree, if there is no leaf with key `k` in the trie and leaf node `k1` which has longest common prefix with `k` in all leafs of the trie. Suppose the length of the common prefix is `l` and currently the length of prefix of leaf node `k1` is still less than `l`, then the depth of BMPT path would be changed after being updated. In this case, in the (non-existing) proof for the empty node of key `k`, the BMPT path has to be re-organized to reflect the trie state right before leaf node of key `k` being updated to an empty node, or right after the leaf node being removed and the empty node left. Take the following as an example:
 
 ![a Merkle tree storing example](https://i.imgur.com/SaLpIn3.png)
 
@@ -104,7 +104,7 @@ The BMPT transition proof uses the following columns:
 >  + `Mid`: indicate a branch node
 >  + `Leaf`: indicate a leaf node
 >  + `Empty`: indicate an empty node, the hash of this node is Fq::Zero
->  + `LeafExt`: indicate a "virtual" node in the leaf inserted / deleted case, which in fact exist only in the updated state, the node hash for these node types is just equal to its child
+>  + `LeafExt`: indicate a "virtual" node in the leaf inserted / deleted case, which in fact exists only in the updated state, and the node hash for these node types is just equal to its child
 >  + `LeafExtFinal`: Parent of the empty node which would be updated
 
 > `sibling`: The siblings of nodes in BMPT path
@@ -123,7 +123,7 @@ and defining following columns in the data part:
 
 There are two groups of constraints: one for the validity of BMPT path and one for the validity of the correction in state transition
 
-There are two BMPT paths in the proof (for the columns with 'Old-' and 'New-' prefix), to provide the validity of them we should:
+There are two BMPT paths in the proof (for the columns with 'Old-' and 'New-' prefix), to prove the validity of them we should:
 
 + construct and look up the hash calculations from hash table (see below) according to the node type for current row:
 
@@ -146,7 +146,7 @@ There are two BMPT paths in the proof (for the columns with 'Old-' and 'New-' pr
 
 + finally, we must constraint a proof must end its layout with `Empty` or `Leaf` node. We just assign `OldHashType` as the `ctrl_type` column in controlling part. For `op_type` is 1 or 3 (the two BMPT proof for two tries), the value of `op_type` can be change only when `ctrl_type` is `Empty` or `Leaf`
 
-To provide the transition, i.e. the relationship between two BMPT path is correct, we constraint the two node type in the same layer, that is, `OldHashType` and `NewHashType` has to be one of the following pairs (Notice the reversed of one pair is also valid):
+To prove the transition, i.e. the relationship between two BMPT paths is correct, we constraint the two node type in the same layer, that is, `OldHashType` and `NewHashType` has to be one of the following pairs (Notice the reversed of one pair is also valid):
 
 >    * `Start` - `Start`
 >    * `Leaf` - `Leaf`
