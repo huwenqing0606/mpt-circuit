@@ -268,6 +268,7 @@ impl From<SMTTrace> for Proof {
 
         let account_key = account_key(claim.address);
         let leafs = trace.account_path.clone().map(get_leaf).map(|x| x.unwrap());
+        // wenqing: open is old, close is new
         let [open_hash_traces, close_hash_traces] =
             trace.account_path.clone().map(|path| path.path);
         let leaf_hashes = trace.account_path.clone().map(leaf_hash);
@@ -317,6 +318,7 @@ fn leaf_hash(path: SMTPath) -> Fr {
     }
 }
 
+// wenqing: from an AccountData obtain the trace of account hash
 fn account_hash_traces(address: Address, account: AccountData, storage_root: Fr) -> [[Fr; 3]; 6] {
     let real_account: Account<Fr> = (&account, storage_root).try_into().unwrap();
 
@@ -593,6 +595,7 @@ fn check_hash_traces_new(traces: &[(bool, Fr, Fr, Fr, bool, bool)]) {
     }
 }
 
+// wenqing: parse the SMTPath and checks if its root is computed correctly
 fn path_root(path: SMTPath) -> Fr {
     let parse: SMTPathParse<Fr> = SMTPathParse::try_from(&path).unwrap();
     for (a, b, c) in parse.0.hash_traces {
