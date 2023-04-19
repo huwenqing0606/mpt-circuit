@@ -377,6 +377,7 @@ fn get_internal_hash_traces(
                     false,
                 )
             }
+            // wenqing: this corresponds to PathType::ExtensionOld
             EitherOrBoth::Left(open) => (
                 key.bit(i),
                 fr(open.value),
@@ -385,6 +386,7 @@ fn get_internal_hash_traces(
                 false,
                 true,
             ),
+            // wenqing: this corresponds to PathType::ExtensionNew
             EitherOrBoth::Right(close) => (
                 key.bit(i),
                 leaf_hashes[0],

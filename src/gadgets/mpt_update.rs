@@ -20,6 +20,7 @@ use strum_macros::EnumIter;
 
 /// Each row of an mpt update belongs to one of four segments.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
+// wenqing: need to address their meaning in new spec
 enum SegmentType {
     Start,
     AccountTrie,
@@ -34,6 +35,8 @@ enum SegmentType {
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, EnumIter)]
+// wenqing: need to correspond this with LeafExt and LeafExtFinal in old mpt circuit
+//          need to address their meaning in new spec
 enum PathType {
     Common,       // Hashes for both the old and new path are being updated.
     ExtensionOld, // The old path is being extended. The new hash doesn't change.
